@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+import runpy
+import sys
+
+sys.path.insert(0, "/usr/lib")
+runpy.run_module("cw-software", run_name="__main__")
