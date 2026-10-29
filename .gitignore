@@ -3,6 +3,7 @@
 *asc*
 *key*
 *.bak*/
+!public.asc
 
 
 # Byte-compiled / optimized / DLL files
