@@ -3,20 +3,19 @@
 name: cw-software
 arch: all
 platform: linux
-version: 1.1.1
+version: ${VERSION}
 release: 1
 
 maintainer: Carbonwarp <support@carbonwarp.com>
 vendor: Carbonwarp
 homepage: https://github.com/carbonwarp/software
 license: MIT
-description: Software store for rpm based atomic operating systems.
+description: Software store for atomic operating systems.
 
 depends:
   - python3
   - flatpak
   - dnf
-  - 
 
 contents:
   - src: ./src/

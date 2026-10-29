@@ -10,4 +10,4 @@ all:
 	rm -rf dist
 	mkdir dist
 	nfpm package   --config nfpm.yaml   --packager rpm   --target dist/
-
+	printf "done\n"
