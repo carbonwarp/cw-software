@@ -47,9 +47,11 @@ class Runner:
         self.on_done(proc.get_exit_status() if proc.get_if_exited() else -1)
 
 
-def capture(argv, callback, env=None):
+def capture(argv, callback, env=None, timeout=None):
     """Run a command, call callback(status, stdout, stderr) when finished.
-    env: optional dict of extra environment variables (e.g. {"LC_ALL": "C"})."""
+    env: optional dict of extra environment variables (e.g. {"LC_ALL": "C"}).
+    timeout: seconds; the process is killed and callback(-1, ...) fires if it runs longer
+    (keeps network-dependent commands from hanging the UI on a weak connection)."""
     flags = Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
     try:
         if env:
@@ -63,7 +65,22 @@ def capture(argv, callback, env=None):
         callback(-1, "", e.message)
         return
 
+    timer = [0]
+    timed_out = [False]
+
+    def expire():
+        timer[0] = 0
+        timed_out[0] = True
+        proc.force_exit()
+        return False
+
     def done(p, res):
+        if timer[0]:
+            GLib.source_remove(timer[0])
+            timer[0] = 0
+        if timed_out[0]:
+            callback(-1, "", "timed out")
+            return
         try:
             _ok, out, err = p.communicate_utf8_finish(res)
         except GLib.Error as e:
@@ -72,4 +89,6 @@ def capture(argv, callback, env=None):
         status = p.get_exit_status() if p.get_if_exited() else -1
         callback(status, out or "", err or "")
 
+    if timeout:
+        timer[0] = GLib.timeout_add_seconds(int(timeout), expire)
     proc.communicate_utf8_async(None, None, done)

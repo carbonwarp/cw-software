@@ -36,7 +36,7 @@ contents:
     dst: /usr/bin/
     type: tree
 
-  - src: ./packaging/com.carbonwarp.software.desktop
+  - src: ./data/com.carbonwarp.software.desktop
     dst: /usr/share/applications/com.carbonwarp.software.desktop
     file_info:
       mode: 0644

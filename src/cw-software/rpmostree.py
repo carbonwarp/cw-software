@@ -74,7 +74,7 @@ def parse_check(status, out, err):
 def check_update(callback):
     """Ask rpm-ostree whether a new deployment exists. callback(available, version, error)."""
     capture(["rpm-ostree", "upgrade", "--check"],
-            lambda st, out, err: callback(*parse_check(st, out, err)), env={"LC_ALL": "C"})
+            lambda st, out, err: callback(*parse_check(st, out, err)), env={"LC_ALL": "C"}, timeout=90)
 
 
 def installed_names(callback):

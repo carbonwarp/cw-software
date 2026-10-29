@@ -61,6 +61,10 @@ def update_argv(app_id, scope):
     return ["flatpak", "update", *_scope(scope), "-y", "--noninteractive", app_id]
 
 
+def update_all_argv(scope):
+    return ["flatpak", "update", *_scope(scope), "-y", "--noninteractive"]
+
+
 def updates(scope, callback):
     """Apps with a pending update, straight from the remotes (network).
     callback(set_of_app_ids) or callback(None) when the check failed."""
@@ -70,7 +74,7 @@ def updates(scope, callback):
             return
         callback({l.strip() for l in out.splitlines() if "." in l and " " not in l.strip()})
     capture(["flatpak", "remote-ls", *_scope(scope), "--updates", "--app",
-             "--columns=application"], done, env={"LC_ALL": "C"})
+             "--columns=application"], done, env={"LC_ALL": "C"}, timeout=40)
 
 
 def uninstall_argv(app_id, scope):
@@ -100,4 +104,5 @@ def remote_info(scope, remote, app_id, callback):
                 if m:
                     info.setdefault(m.group(1).strip().lower(), m.group(2).strip())
         callback(info)
-    capture(["flatpak", "remote-info", *_scope(scope), remote, app_id], done, env={"LC_ALL": "C"})
+    capture(["flatpak", "remote-info", *_scope(scope), remote, app_id], done,
+            env={"LC_ALL": "C"}, timeout=30)

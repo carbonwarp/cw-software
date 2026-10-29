@@ -74,19 +74,55 @@ def _sig_cached(name, files, parse):
     return data
 
 
-def _ttl_cached(name, producer, force):
+def _swr_cached(name, offline, online, force):
+    """Stale-while-revalidate cache: never makes the UI wait for the network.
+
+    force            -> run `online` now (explicit Refresh), cache the answer.
+    cache exists     -> return it at once, however old; when older than TTL a silent
+                        background thread refreshes it for the next start.
+    no cache at all  -> try `offline` (local metadata only), then `online` as a last resort."""
     path = os.path.join(CACHE_DIR, name + ".json")
     if not force:
         try:
-            if time.time() - os.path.getmtime(path) < TTL:
-                with open(path) as f:
-                    return json.load(f)
+            with open(path) as f:
+                data = json.load(f)
+            if data:
+                if time.time() - os.path.getmtime(path) >= TTL:
+                    _revalidate(path, online)
+                return data
         except (OSError, ValueError):
             pass
-    data = producer()
+        try:
+            data = offline()
+        except (RuntimeError, OSError, subprocess.SubprocessError):
+            data = None
+        if data:
+            _dump(path, data)
+            return data
+    data = online()
     if data:  # never cache an empty answer
         _dump(path, data)
     return data
+
+
+_REVALIDATING = set()
+
+
+def _revalidate(path, online):
+    if path in _REVALIDATING:
+        return
+    _REVALIDATING.add(path)
+
+    def work():
+        try:
+            data = online()
+            if data:
+                _dump(path, data)
+        except (RuntimeError, OSError, subprocess.SubprocessError):
+            pass  # offline / flaky network: keep serving the old cache
+        finally:
+            _REVALIDATING.discard(path)
+    threading.Thread(target=work, daemon=True).start()
 
 
 def _dump(path, obj):
@@ -104,12 +140,13 @@ def dnf_available():
     return shutil.which("dnf") is not None
 
 
-def _repoquery(extra, refresh=False):
-    cmd = ["dnf", "-q"] + (["--refresh"] if refresh else []) + [
+def _repoquery(extra, refresh=False, offline=False, timeout=300):
+    """offline=True answers from the local metadata cache only (never touches the network)."""
+    cmd = ["dnf", "-q"] + (["--refresh"] if refresh else []) + (["--cacheonly"] if offline else []) + [
         "repoquery", "--available", "--latest-limit=1",
         f"--arch={platform.machine()},noarch", *extra,
         "--queryformat", "%{name}\t%{summary}\n"]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     if res.returncode != 0:
         raise RuntimeError(res.stderr.strip().splitlines()[-1] if res.stderr.strip()
                            else "dnf repoquery failed")
@@ -123,34 +160,47 @@ def _repoquery(extra, refresh=False):
     return rows
 
 
-def _query_gui(refresh):
-    rows = _repoquery(["--whatprovides", "application(*)"], refresh)
+def _query_gui(refresh, offline=False):
+    rows = _repoquery(["--whatprovides", "application(*)"], refresh, offline)
     if not rows:  # older packaging without application() provides
-        rows = _repoquery(["--file", "/usr/share/applications/*.desktop"], refresh)
+        rows = _repoquery(["--file", "/usr/share/applications/*.desktop"], refresh, offline)
     return rows
+
+
+def _query_cli(refresh, offline=False):
+    return _repoquery(["--file", "/usr/bin/*", "/usr/sbin/*"], refresh, offline)
 
 
 def load_dnf(show_cli, force=False):
     """Rows [name, summary, is_gui, is_cli]. force=True re-queries (and refreshes dnf metadata)."""
-    rows = {n: [n, s, 1, 0] for n, s in _ttl_cached("dnf-gui", lambda: _query_gui(force), force)}
+    rows = {n: [n, s, 1, 0] for n, s in _swr_cached(
+        "dnf-gui", lambda: _query_gui(False, True), lambda: _query_gui(force), force)}
     if show_cli:
-        cli = _ttl_cached("dnf-cli", lambda: _repoquery(["--file", "/usr/bin/*", "/usr/sbin/*"], force),
-                          force)
+        cli = _swr_cached("dnf-cli", lambda: _query_cli(False, True),
+                          lambda: _query_cli(force), force)
         for n, s in cli:
             rows.setdefault(n, [n, s, 0, 1])
     return list(rows.values())
 
 
 def dnf_upgrades(refresh=False):
-    """Names of installed packages that have a newer version in the repos. Blocking: use in_thread."""
-    cmd = ["dnf", "-q"] + (["--refresh"] if refresh else []) + [
-        "repoquery", "--upgrades", "--latest-limit=1",
-        f"--arch={platform.machine()},noarch", "--queryformat", "%{name}\n"]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-    if res.returncode != 0:
-        raise RuntimeError(res.stderr.strip().splitlines()[-1] if res.stderr.strip()
-                           else "dnf repoquery --upgrades failed")
-    return sorted({l.strip() for l in res.stdout.splitlines() if l.strip()})
+    """Names of installed packages that have a newer version in the repos. Blocking: use in_thread.
+    Tries the network (short timeout); on a weak/offline connection falls back to the
+    local metadata cache instead of hanging."""
+    def run(offline):
+        cmd = ["dnf", "-q"] + (["--refresh"] if refresh and not offline else []) + \
+              (["--cacheonly"] if offline else []) + [
+            "repoquery", "--upgrades", "--latest-limit=1",
+            f"--arch={platform.machine()},noarch", "--queryformat", "%{name}\n"]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300 if refresh else 45)
+        if res.returncode != 0:
+            raise RuntimeError(res.stderr.strip().splitlines()[-1] if res.stderr.strip()
+                               else "dnf repoquery --upgrades failed")
+        return sorted({l.strip() for l in res.stdout.splitlines() if l.strip()})
+    try:
+        return run(False)
+    except (RuntimeError, subprocess.SubprocessError):
+        return run(True)
 
 
 _TERM_OK = re.compile(r"^[A-Za-z0-9._+-]{2,64}$")
@@ -162,7 +212,7 @@ def search_rpm(term):
     term = term.strip()
     if not _TERM_OK.match(term) or not dnf_available():
         return []
-    return _repoquery([f"*{term}*"])
+    return _repoquery([f"*{term}*"], offline=True, timeout=30)  # typing never hits the network
 
 
 # ---------- AppStream (pretty names, icons) ----------

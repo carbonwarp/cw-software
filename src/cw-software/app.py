@@ -538,7 +538,9 @@ def fill_state(win, e, tags, slot, installed_view=False, big=False):
                 "Part of the system image; updated from the System tab"
                 if e.rpm_state == "base" and not e.flatpak_installed else None))
         else:
-            slot.append(dim_label("Checking…" if win.checking_updates else "Update status unknown"))
+            # Update checks need the network and may be slow: never block or nag the tile.
+            if not win.checking_updates:
+                slot.append(dim_label("Update status unknown"))
     else:
         inst = []
         if e.flatpak_id:
@@ -1666,6 +1668,86 @@ class StoreWindow(Adw.ApplicationWindow):
     def update_system(self):
         self.run_command(rpmostree.update_argv(), reboot=True, kind="system")
 
+    # ----- command-line / launcher-action entry points -----
+
+    def _feed_view(self, installed=False, term=""):
+        self.nav.pop_to_tag("main")
+        self.stack.set_visible_child(self.feed_all)
+        feed = self.feed_all
+        (feed.chip_inst if installed else feed.chip_all).set_active(True)
+        feed.entry.set_text(term)
+        feed.entry.grab_focus()
+        return feed
+
+    def run_cli(self, args):
+        """Execute `cw-software <args>` inside the running window. Returns an error text or None.
+        Explicit commands (system update, update all...) start right away: typing them is the
+        confirmation. Package-manager polkit prompts still apply."""
+        a = [x.lower() for x in args[:2]]
+        rest = args[1:]
+        if not args or a[0] in ("apps", "home", "store"):
+            self._feed_view()
+        elif a[0] == "search":
+            self._feed_view(term=" ".join(rest))
+        elif a[0] == "installed":
+            self._feed_view(installed=True, term=" ".join(rest))
+        elif a[0] in ("show", "open") and rest:
+            term = " ".join(rest).strip().casefold()
+            self._feed_view()
+            hit = next((e for e in self.entries
+                        if term in {(e.flatpak_id or "").casefold(), (e.appstream_id or "").casefold(),
+                                    (e.rpm_pkg or "").casefold(), (e.name or "").casefold()}), None)
+            if hit is None:
+                self._feed_view(term=" ".join(rest))
+                if not self.catalog_ready:      # still loading: the search will fill in
+                    return None
+                return f"no app named '{' '.join(rest)}' - showing search results"
+            self.show_details(hit)
+        elif a[0] in ("updates", "check"):
+            self._feed_view(installed=True)
+            self.refresh_updates()
+        elif a[0] == "update" and (len(a) < 2 or a[1] == "all"):      # update [all]
+            self._feed_view(installed=True)
+            self.update_all()
+        elif a[0] == "update" and a[1] in ("apps", "flatpak"):
+            self._feed_view(installed=True)
+            self.run_command(flatpak.update_all_argv(self.config["scope"]))
+        elif a[0] == "update" and a[1] == "system":
+            self.run_cli(["system", "update"])
+        elif a[0] == "system":
+            self.nav.pop_to_tag("main")
+            self.stack.set_visible_child(self.system_page)
+            sub = a[1] if len(a) > 1 else ""
+            if sub in ("update", "upgrade"):
+                if not self.rpm_enabled:
+                    return "rpm-ostree is not available on this system"
+                self.update_system()
+            elif sub == "check":
+                self.refresh_updates()
+            elif sub == "reboot":
+                self.reboot()
+            elif sub:
+                return f"unknown system command '{sub}' (try: update, check, reboot)"
+        elif a[0] == "refresh":
+            self._on_refresh()
+        elif a[0] in ("preferences", "prefs", "settings"):
+            self._open_prefs()
+        elif a[0] == "about":
+            self._show_about()
+        else:
+            return f"unknown command '{args[0]}'"
+        return None
+
+    def update_all(self):
+        """Flatpak apps first, then the system (rpm-ostree)."""
+        flat = flatpak.available()
+        if flat and self.rpm_enabled:
+            self.run_command(flatpak.update_all_argv(self.config["scope"]), after=self.update_system)
+        elif flat:
+            self.run_command(flatpak.update_all_argv(self.config["scope"]))
+        elif self.rpm_enabled:
+            self.update_system()
+
     def set_busy(self, busy, kind=None):
         self.busy = busy
         self.op_kind = kind if busy else None
@@ -1910,9 +1992,32 @@ class StoreWindow(Adw.ApplicationWindow):
         self.toasts.add_toast(Adw.Toast.new(text))
 
 
+CLI_HELP = f"""Software {VERSION} - Flathub + RPM app store for rpm-ostree systems
+
+Usage: cw-software [COMMAND]
+
+  (none) | apps            open the store
+  search TERM              open the store with a search
+  installed [TERM]         show installed apps
+  show APP                 open an app's page (name, Flatpak ID or RPM package)
+  updates | check          check for app + system updates
+  update [all]             update Flatpak apps, then the system
+  update apps              update Flatpak apps only
+  update system            same as: system update
+  system                   open the System tab
+  system update            start the rpm-ostree update now
+  system check             check for a new system deployment
+  system reboot            reboot
+  refresh                  re-download package data
+  preferences | about
+  --version | --help
+"""
+
+
 class StoreApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        super().__init__(application_id=APP_ID,
+                         flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
         self.config = Config()
 
     def do_startup(self):
@@ -1924,6 +2029,19 @@ class StoreApp(Adw.Application):
         self.set_accels_for_action("app.quit", ["<primary>q"])
         self.set_accels_for_action("win.preferences", ["<primary>comma"])
 
-    def do_activate(self):
+    def do_command_line(self, cmdline):
+        args = cmdline.get_arguments()[1:]
+        if args and args[0] in ("-h", "--help", "help"):
+            cmdline.print_literal(CLI_HELP)
+            return 0
+        if args and args[0] in ("-v", "--version", "version"):
+            cmdline.print_literal(f"Software {VERSION}\n")
+            return 0
         win = self.props.active_window or StoreWindow(self, self.config)
         win.present()
+        err = win.run_cli(args) if args else None
+        if err:
+            win.toast(err)
+            cmdline.printerr_literal(f"cw-software: {err}\n")
+            return 2 if err.startswith("unknown") else 0
+        return 0

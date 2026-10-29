@@ -63,20 +63,90 @@ _PROD_TXT = re.compile(r"word processor|spreadsheet|presentation|office suite|no
 _GAME_TXT = re.compile(r"\bgames?\b|\barcade\b|\bpuzzle\b|game launcher|\bplatformer\b|"
                        r"\bchess\b|\bsolitaire\b", re.I)
 _GAME_LAUNCHER = re.compile(r"steam|heroic|lutris|bottles|itch|prismlauncher|gamescope", re.I)
-# Exact AppStream/Flatpak IDs belong here; keep product-specific exceptions in
-# one place instead of scattering name-regex checks through classification.
-APP_GROUP_OVERRIDES = {
-    "com.visualstudio.code": DEVELOPMENT,
-    "org.libreoffice.libreoffice": PRODUCTIVITY,
-    "org.onlyoffice.desktopeditors": PRODUCTIVITY,
-    "com.valvesoftware.steam": GAMING,
+# Curated, most-wanted apps per store section, in display order (first = top of the section).
+# IDs are Flathub / AppStream IDs; matching is case-insensitive and also applies to RPM
+# entries that share the ID (e.g. Fedora's org.mozilla.firefox). Every ID listed here is
+# pinned to its section (so a quirky AppStream category can't misfile it) and ranked by
+# its position. Add or reorder IDs freely: this is the only place that needs editing.
+FEATURED_APPS = {
+    DEVELOPMENT: [
+        "com.visualstudio.code", "com.vscodium.codium", "dev.zed.Zed",
+        "com.jetbrains.IntelliJ-IDEA-Community", "com.jetbrains.PyCharm-Community",
+        "com.jetbrains.IntelliJ-IDEA-Ultimate", "com.jetbrains.PyCharm-Professional",
+        "com.jetbrains.WebStorm", "com.jetbrains.GoLand", "com.jetbrains.RustRover",
+        "com.jetbrains.CLion", "com.jetbrains.PhpStorm", "com.jetbrains.Rider",
+        "com.jetbrains.DataGrip", "com.google.AndroidStudio", "org.gnome.Builder",
+        "io.github.shiftey.Desktop", "com.axosoft.GitKraken", "org.gnome.gitg",
+        "com.getpostman.Postman", "rest.insomnia.Insomnia", "com.usebruno.Bruno",
+        "io.dbeaver.DBeaverCommunity", "org.sqlitebrowser.sqlitebrowser",
+        "io.podman_desktop.PodmanDesktop", "org.godotengine.Godot", "com.unity.UnityHub",
+        "org.kde.kate", "org.kde.kdevelop", "com.sublimetext.three", "org.gnu.emacs",
+        "io.neovim.nvim", "org.vim.Vim", "dev.lapce.lapce", "org.eclipse.Java",
+        "org.gnome.Meld", "org.wireshark.Wireshark", "org.filezillaproject.Filezilla",
+        "io.beekeeperstudio.Studio", "com.mongodb.Compass", "com.github.Murmele.Gittyup",
+        "org.gnome.Devhelp", "com.github.tchx84.Flatseal",
+    ],
+    GAMING: [
+        "com.valvesoftware.Steam", "com.heroicgameslauncher.hgl", "net.lutris.Lutris",
+        "com.usebottles.bottles", "org.prismlauncher.PrismLauncher", "com.mojang.Minecraft",
+        "net.davidotek.pupgui2", "com.github.Matoking.protontricks", "org.vinegarhq.Sober",
+        "io.itch.itch", "com.moonlight_stream.Moonlight", "io.github.Faugus.faugus-launcher",
+        "org.libretro.RetroArch", "net.retrodeck.retrodeck", "org.DolphinEmu.dolphin-emu",
+        "net.pcsx2.PCSX2", "org.duckstation.DuckStation", "org.ppsspp.PPSSPP",
+        "net.rpcs3.RPCS3", "io.mgba.mGBA", "net.kuribo64.melonDS", "info.cemu.Cemu",
+        "org.azahar_emu.Azahar", "app.xemu.xemu", "org.flycast.Flycast",
+        "org.scummvm.ScummVM", "com.dosbox_x.DOSBox-X", "net.runelite.RuneLite",
+        "org.supertuxproject.SuperTux", "net.supertuxkart.SuperTuxKart", "com.play0ad.zeroad",
+        "org.openttd.OpenTTD", "io.openrct2.OpenRCT2", "org.openra.OpenRA",
+        "org.openmw.OpenMW", "net.wz2100.wz2100", "org.xonotic.Xonotic",
+        "com.steamgriddb.steam-rom-manager", "io.github.Foldex.AdwSteamGtk",
+        "dev.goats.xivlauncher", "io.mrarm.mcpelauncher",
+    ],
+    PRODUCTIVITY: [
+        "org.libreoffice.LibreOffice", "org.onlyoffice.desktopeditors", "md.obsidian.Obsidian",
+        "org.mozilla.Thunderbird", "net.cozic.joplin_desktop", "com.logseq.Logseq",
+        "io.appflowy.AppFlowy", "org.zotero.Zotero", "org.gnome.Papers", "org.kde.okular",
+        "com.calibre_ebook.calibre", "com.github.johnfactotum.Foliate",
+        "org.xournalpp.Xournalpp", "com.github.flxzt.rnote", "org.pdfarranger.pdfarranger",
+        "io.github.alainm23.planify", "org.gnome.Calendar", "org.kde.merkuro.calendar",
+        "com.getmailspring.Mailspring", "me.proton.Mail", "org.standardnotes.standardnotes",
+        "org.gnome.Evolution", "org.freeplane.App", "com.github.ahrm.sioyek",
+        "org.gnome.Contacts", "org.gnome.TextEditor", "org.gnome.gnumeric",
+        "org.gnome.Notes", "org.kde.kontact",
+    ],
+    OTHER: [
+        "org.mozilla.firefox", "com.google.Chrome", "org.chromium.Chromium",
+        "com.brave.Browser", "io.gitlab.librewolf-community", "com.microsoft.Edge",
+        "org.videolan.VLC", "io.mpv.Mpv", "com.spotify.Client", "com.discordapp.Discord",
+        "dev.vencord.Vesktop", "org.telegram.desktop", "org.signal.Signal",
+        "com.slack.Slack", "us.zoom.Zoom", "com.obsproject.Studio", "org.gimp.GIMP",
+        "org.kde.krita", "org.inkscape.Inkscape", "org.blender.Blender",
+        "org.audacityteam.Audacity", "org.kde.kdenlive", "org.shotcut.Shotcut",
+        "org.darktable.Darktable", "fr.handbrake.ghb", "org.qbittorrent.qBittorrent",
+        "com.bitwarden.desktop", "org.keepassxc.KeePassXC", "me.proton.Pass",
+        "com.github.tchx84.Flatseal", "it.mijorus.gearlever", "io.missioncenter.MissionCenter",
+        "com.mattjakeman.ExtensionManager", "com.rustdesk.RustDesk", "org.remmina.Remmina",
+        "org.localsend.localsend_app", "io.bassi.Amberol", "com.github.wwmm.easyeffects",
+        "tv.plex.PlexDesktop", "org.jellyfin.JellyfinDesktop", "org.gnome.Boxes",
+        "com.rtosta.zapzap", "org.nickvision.tubeconverter",
+    ],
 }
 
-# Exact IDs to float to the top of their section. Add IDs here as needed.
-FEATURED_APP_IDS = {
-    DEVELOPMENT: {"com.visualstudio.code"},
-    GAMING: {"com.valvesoftware.steam"},
-}
+# Exact (case-folded) ID -> store section, derived from the curated lists above.
+# An ID listed in two sections goes to the first one that names it
+# (Development, Gaming, Productivity, Other).
+APP_GROUP_OVERRIDES = {}
+for _grp in (DEVELOPMENT, GAMING, PRODUCTIVITY, OTHER):
+    for _id in FEATURED_APPS[_grp]:
+        APP_GROUP_OVERRIDES.setdefault(_id.casefold(), _grp)
+
+# Position of each curated ID inside its own section (lower = nearer the top).
+FEATURED_RANK = {}
+for _grp, _ids in FEATURED_APPS.items():
+    for _i, _id in enumerate(_ids):
+        if APP_GROUP_OVERRIDES[_id.casefold()] == _grp:
+            FEATURED_RANK[_id.casefold()] = _i
+_NOT_FEATURED = 10 ** 6
 
 
 def classify(e):
@@ -114,10 +184,9 @@ def text_for_entry(e):
 
 
 def featured_rank(e):
-    """Rank explicitly configured app IDs first within their section."""
+    """Curated apps first within their section, in the order of FEATURED_APPS."""
     app_ids = {x.strip().casefold() for x in (e.appstream_id, e.flatpak_id) if x}
-    featured = FEATURED_APP_IDS.get(e.group, set())
-    return 0 if app_ids & featured else 1
+    return min((FEATURED_RANK.get(i, _NOT_FEATURED) for i in app_ids), default=_NOT_FEATURED)
 
 
 def norm(text):
