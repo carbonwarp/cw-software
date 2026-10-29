@@ -8,7 +8,7 @@
 
 Software store for RPM-based atomic operating systems with a unified interface to manage system packages, sandboxed applications from Flathub, and system updates.
 
-[Get .rpm](github.com/carbonwarp/cw-software/releases/latest/cw-software.rpm)
+[Get .rpm](https://github.com/carbonwarp/cw-software/releases/latest/download/cw-software-latest.rpm)
 
 ### Key Features
 
