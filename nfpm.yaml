@@ -8,15 +8,25 @@ release: 1
 
 maintainer: Carbonwarp <support@carbonwarp.com>
 vendor: Carbonwarp
-homepage: https://github.com/carbonwarp/software
+homepage: https://github.com/carbonwarp/cw-software
 license: MIT
 description: Software store for atomic operating systems.
 
 depends:
   - python3
+  - python3-gobject
+  - gtk4
+  - libadwaita
   - flatpak
   - dnf
-
+  - rpm-ostree
+  - rpm
+  - systemd
+  - zstd
+  - gzip
+  - xz
+  - bzip2
+  
 contents:
   - src: ./src/
     dst: /usr/lib/

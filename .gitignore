@@ -1,8 +1,8 @@
-# keys
-
 *asc*
 *key*
 *.bak*/
+*.zip
+
 !public.asc
 
 
