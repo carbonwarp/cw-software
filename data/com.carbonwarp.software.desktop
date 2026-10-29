@@ -9,49 +9,18 @@ StartupNotify=true
 StartupWMClass=com.carbonwarp.software
 Categories=System;PackageManager;GTK;
 Keywords=store;apps;software;flatpak;flathub;rpm;ostree;update;install;
-Actions=Search;Installed;CheckUpdates;UpdateAll;UpdateApps;SystemUpdate;SystemCheck;System;Refresh;Preferences;About;
-
-[Desktop Action Search]
-Name=Search apps
-Exec=cw-software search
+Actions=Installed;UpdateAll;SystemUpdate;
 
 [Desktop Action Installed]
 Name=Installed apps
 Exec=cw-software installed
 
-[Desktop Action CheckUpdates]
-Name=Check for updates
-Exec=cw-software updates
-
 [Desktop Action UpdateAll]
 Name=Update everything
 Exec=cw-software update all
-
-[Desktop Action UpdateApps]
-Name=Update apps (Flatpak)
-Exec=cw-software update apps
 
 [Desktop Action SystemUpdate]
 Name=Update system
 Exec=cw-software system update
 
-[Desktop Action SystemCheck]
-Name=Check for system update
-Exec=cw-software system check
-
-[Desktop Action System]
-Name=Open System tab
-Exec=cw-software system
-
-[Desktop Action Refresh]
-Name=Refresh package data
-Exec=cw-software refresh
-
-[Desktop Action Preferences]
-Name=Preferences
-Exec=cw-software preferences
-
-[Desktop Action About]
-Name=About
-Exec=cw-software about
 
