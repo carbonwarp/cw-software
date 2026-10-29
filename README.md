@@ -8,12 +8,14 @@
   **[Download Latest RPM](https://github.com/carbonwarp/cw-software/releases/latest/download/cw-software-latest.rpm)**
 </div>
 
+Carbonwarp Software smartly manages refresh cycles for indexing, avoiding unnecessary updates to data that changes once in a blue moon while keeping frequently changing information reasonably up to date with a step of flexibility for triggering refreshes manually  whenever needed, ensuring they remain in control. Feeds are thoughtfully curated and presented with the user experience in mind, prioritizing relevance, usability, and convenience.
+
 ## Features
 
 - **Atomic-First:** Designed specifically for atomic operating systems and their package management workflows.
 - **Fast and Reliable:** A smooth and dependable software management experience.
 - **Unified Management:** Manage system packages, sandboxed applications, and system updates in one place.
-- **Native GNOME Experience:** A familiar interface tailored to the GNOME desktop.
+
 
 **Supported Platforms:** AlmaLinux Bootc, Fedora Atomic Desktops, and RHEL for Edge.
 
@@ -22,9 +24,9 @@
 <div align="center">
   <img src="screenshots/apps.png" width="100%" alt="Application catalog" />
   <br />
-  <img src="screenshots/installed.png" width="32%" alt="Installed applications" />
-  <img src="screenshots/installed-firefox.png" width="32%" alt="Firefox application details" />
-  <img src="screenshots/system.png" width="32%" alt="System management" />
+  <img src="screenshots/installed.png" width="33%" alt="Installed applications" />
+  <img src="screenshots/installed-firefox.png" width="33%" alt="Firefox application details" />
+  <img src="screenshots/system.png" width="33%" alt="System management" />
 </div>
 
 ## Installation
@@ -51,8 +53,6 @@ cd cw-software
 make VERSION="1.4.3"
 rpm-ostree install dist/*.rpm
 ```
-
-The build produces RPM packages in the `dist/` directory.
 
 ## Contributing
 
