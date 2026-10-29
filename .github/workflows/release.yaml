@@ -1,0 +1,116 @@
+name: Build and Release # publish on tag push. If its not a version id, it goes to prerelease
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version and release type
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+            echo "Invalid release tag: $GITHUB_REF_NAME (expected vX.Y.Z or vX.Y.Z-name)"
+            exit 1
+          fi
+
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE="true"
+          else
+            PRERELEASE="false"
+            git fetch origin main
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+              echo "Stable tag $GITHUB_REF_NAME must point to a commit on main."
+              echo "Use vX.Y.Z-name for branch builds."
+              exit 1
+            fi
+          fi
+
+          BRANCHES="$(git branch -r --contains "$GITHUB_SHA" | sed 's/^ *origin\///; /HEAD/d' | paste -sd, - | sed 's/,/, /g')"
+
+          {
+            echo "VERSION=$VERSION"
+            echo "PRERELEASE=$PRERELEASE"
+            echo "BRANCHES=${BRANCHES:-none}"
+          } >> "$GITHUB_ENV"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Install nfpm
+        run: |
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Import signing keys
+        env:
+          PRIVATE_SIGNING_KEY: ${{ secrets.PRIVATE_SIGNING_KEY }}
+          PUBLIC_SIGNING_KEY: ${{ secrets.PUBLIC_SIGNING_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$PRIVATE_SIGNING_KEY" > private.asc
+          printf '%s\n' "$PUBLIC_SIGNING_KEY" > public.asc
+          chmod 644 public.asc
+
+      - name: Build packages
+        env:
+          NFPM_PASSPHRASE: ${{ secrets.NFPM_PASSPHRASE }}
+        run: make VERSION="$VERSION"
+
+      - name: Add stable asset names
+        if: env.PRERELEASE == 'false'
+        run: |
+          shopt -s nullglob
+          for ext in rpm; do
+            latest="dist/cw-software-latest.$ext"
+            [[ -e "$latest" ]] && continue
+
+            files=(dist/*."$ext")
+            if [[ ${#files[@]} -ne 1 ]]; then
+              echo "Expected exactly one .$ext file in dist/, found: ${files[*]}"
+              exit 1
+            fi
+            cp "${files[0]}" "$latest"
+          done
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$PRERELEASE" == "true" ]]; then
+            FLAGS=(--prerelease --latest=false)
+            NOTE="Prerelease. Commit $GITHUB_SHA is on: $BRANCHES"
+          else
+            FLAGS=(--latest)
+            NOTE="Stable release."
+          fi
+
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "$NOTE" \
+            "${FLAGS[@]}"
+
+      - name: Remove signing keys
+        if: always()
+        run: rm -f private.asc public.asc
