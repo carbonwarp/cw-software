@@ -1,58 +1,65 @@
-<div align="center">
-  <img src=packaging/software.svg alt=cw-software width=200 />
+ <div align="center">
+  <img src="packaging/software.svg" alt="CW Software logo" width="200" />
+
+  # CW Software
+
+  Software store for RPM-based atomic operating systems, with a unified interface to manage system packages, Flathub applications, and system updates.
+
+  **[Download Latest RPM](https://github.com/carbonwarp/cw-software/releases/latest/download/cw-software-latest.rpm)**
 </div>
 
-# Software
+## Features
 
-## CW Software
+- **Atomic-First:** Designed specifically for atomic operating systems and their package management workflows.
+- **Fast and Reliable:** A smooth and dependable software management experience.
+- **Unified Management:** Manage system packages, sandboxed applications, and system updates in one place.
+- **Native GNOME Experience:** A familiar interface tailored to the GNOME desktop.
 
-Software store for RPM-based atomic operating systems with a unified interface to manage system packages, sandboxed applications from Flathub, and system updates.
+**Supported Platforms:** AlmaLinux Bootc, Fedora Atomic Desktops, and RHEL for Edge.
 
-[Get .rpm](https://github.com/carbonwarp/cw-software/releases/latest/download/cw-software-latest.rpm)
+## Screenshots
 
-### Key Features
+<div align="center">
+  <img src="screenshots/apps.png" width="100%" alt="Application catalog" />
+  <br />
+  <img src="screenshots/installed.png" width="32%" alt="Installed applications" />
+  <img src="screenshots/installed-firefox.png" width="32%" alt="Firefox application details" />
+  <img src="screenshots/system.png" width="32%" alt="System management" />
+</div>
 
-- **Atomic-First:** Built specifically for atomic operating systems, with their unique package management workflows in mind.
-- **Fast and Reliable:** Designed to provide a smooth and dependable software management experience.
-- **Filling the Gap:** Addresses the lack of a dedicated, unified software store tailored to atomic systems.
+## Installation
 
-The project's scope is limited to atomic operating systems with a focus on a native GNOME look and feel.
+Download the latest RPM package:
 
-**Supported Platforms:** Alma Linux Bootc, Fedora Atomic Desktops, and RHEL for Edge.
+**[Download cw-software-latest.rpm](https://github.com/carbonwarp/cw-software/releases/latest/download/cw-software-latest.rpm)**
 
+You can also use the direct package URL:
 
-
-### Build from Source
-
-You can use the application via Python or package as rpm and use it. 
-
-**1. via Python**
-
+```text
+https://dl.carbonwarp.com/cw-software.rpm
 ```
-git clone git@github.com:carbonwarp/cw-software.git --depth 1
-cd cw-software/src
-python -m cw-software
-```
 
-**2. Package from source**
+## Build from Source
 
-> Required: nfpm and ascii armored gpg key (private.asc at repo root).
+> Required: nfpm & An ASCII-armored GPG private key named `private.asc` at the repository root
 
-```
-git clone git@github.com:carbonwarp/cw-software.git --depth 1
-cd cw-software && make VERSION="1.4.3"
+### Build and Install
+
+```bash
+git clone https://github.com/carbonwarp/cw-software.git --depth 1
+cd cw-software
+make VERSION="1.4.3"
 rpm-ostree install dist/*.rpm
 ```
 
-You can also use the following url to get the latest rpm package of cw-software which you can download and install or layer at build time.
-```
-https://dl.carbonwarp.com/cw-software.rpm
-```
-### Contributing
+The build produces RPM packages in the `dist/` directory.
 
-Contributions are welcome, provided that both the contributor and the reviewer manually review the changes before they are accepted.
-By contributing to this project, you agree to license your contributions as per the MIT License.
+## Contributing
 
-### License
+Contributions are welcome. Both contributors and reviewers are expected to manually review changes before they are accepted.
+
+By contributing to this project, you agree to license your contributions under the MIT License.
+
+## License
 
 CW Software is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
